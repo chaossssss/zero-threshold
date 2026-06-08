@@ -11,8 +11,12 @@
           <el-col :span="8">
             <el-card shadow="hover">
               <h3>语音控制 (Web Speech API)</h3>
-              <el-button type="primary" @click="toggleVoice" :type="voiceActive ? 'danger' : 'primary'">
-                {{ voiceActive ? '停止录音' : '开始录音' }}
+              <el-button
+                type="primary"
+                @click="toggleVoice"
+                :type="voiceActive ? 'danger' : 'primary'"
+              >
+                {{ voiceActive ? "停止录音" : "开始录音" }}
               </el-button>
               <p>指令: "打开弹窗", "关闭弹窗", "变红", "变蓝"</p>
               <div class="status">识别结果: {{ voiceText }}</div>
@@ -21,19 +25,27 @@
           <el-col :span="8">
             <el-card shadow="hover">
               <h3>手势控制 (HandTrack.js)</h3>
-              <el-button type="primary" @click="toggleHand" :type="handActive ? 'danger' : 'primary'">
-                {{ handActive ? '停止追踪' : '开始追踪' }}
+              <el-button
+                type="primary"
+                @click="toggleHand"
+                :type="handActive ? 'danger' : 'primary'"
+              >
+                {{ handActive ? "停止追踪" : "开始追踪" }}
               </el-button>
               <p>动作: 张开手变绿，握拳变黄</p>
               <div class="status">检测状态: {{ handStatus }}</div>
-              <video ref="handVideo" style="display:none"></video>
+              <video ref="handVideo" style="display: none"></video>
             </el-card>
           </el-col>
           <el-col :span="8">
             <el-card shadow="hover">
               <h3>眼动控制 (WebGazer.js)</h3>
-              <el-button type="primary" @click="toggleGaze" :type="gazeActive ? 'danger' : 'primary'">
-                {{ gazeActive ? '停止眼动' : '开始眼动' }}
+              <el-button
+                type="primary"
+                @click="toggleGaze"
+                :type="gazeActive ? 'danger' : 'primary'"
+              >
+                {{ gazeActive ? "停止眼动" : "开始眼动" }}
               </el-button>
               <p>动作: 注视屏幕左侧或右侧以移动方块</p>
               <div class="status">坐标: {{ gazeX }}, {{ gazeY }}</div>
@@ -41,12 +53,17 @@
           </el-col>
         </el-row>
       </div>
-      
+
       <el-divider />
-      
+
       <div class="demo-area" :style="{ backgroundColor: demoColor }">
         <h2>效果演示区</h2>
-        <div class="gaze-target" :style="{ left: gazeX + 'px', top: gazeY + 'px' }">👀</div>
+        <div
+          class="gaze-target"
+          :style="{ left: gazeX + 'px', top: gazeY + 'px' }"
+        >
+          👀
+        </div>
       </div>
     </el-card>
 
@@ -62,148 +79,169 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import * as handTrack from 'handtrackjs'
+import { ref, onMounted, onUnmounted } from "vue";
+import { ElMessage } from "element-plus";
+import * as handTrack from "handtrackjs";
 
 // --- State ---
-const demoColor = ref('#f0f2f5')
-const dialogVisible = ref(false)
+const demoColor = ref("#f0f2f5");
+const dialogVisible = ref(false);
 
 // --- Voice Control ---
-const voiceActive = ref(false)
-const voiceText = ref('')
-let recognition = null
+const voiceActive = ref(false);
+const voiceText = ref("");
+let recognition = null;
 
 const initVoice = () => {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+  const SpeechRecognition =
+    window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SpeechRecognition) {
-    ElMessage.error('您的浏览器不支持 Web Speech API')
-    return
+    ElMessage.error("您的浏览器不支持 Web Speech API");
+    return;
   }
-  recognition = new SpeechRecognition()
-  recognition.lang = 'zh-CN'
-  recognition.continuous = true
-  recognition.interimResults = false
+  recognition = new SpeechRecognition();
+  recognition.lang = "zh-CN";
+  recognition.continuous = true;
+  recognition.interimResults = false;
 
   recognition.onresult = (event) => {
-    const lastResult = event.results[event.results.length - 1]
-    const text = lastResult[0].transcript.trim()
-    voiceText.value = text
-    
-    if (text.includes('打开弹窗')) {
-      dialogVisible.value = true
-    } else if (text.includes('关闭弹窗')) {
-      dialogVisible.value = false
-    } else if (text.includes('变红')) {
-      demoColor.value = '#ffcccc'
-    } else if (text.includes('变蓝')) {
-      demoColor.value = '#ccccff'
+    const lastResult = event.results[event.results.length - 1];
+    const text = lastResult[0].transcript.trim();
+    voiceText.value = text;
+
+    if (text.includes("打开弹窗")) {
+      dialogVisible.value = true;
+    } else if (text.includes("关闭弹窗")) {
+      dialogVisible.value = false;
+    } else if (text.includes("变红")) {
+      demoColor.value = "#ffcccc";
+    } else if (text.includes("变蓝")) {
+      demoColor.value = "#ccccff";
     }
-  }
+  };
 
   recognition.onend = () => {
     if (voiceActive.value) {
-      recognition.start() // Restart to keep listening
+      recognition.start(); // Restart to keep listening
     }
-  }
-}
+  };
+};
 
 const toggleVoice = () => {
-  if (!recognition) initVoice()
+  if (!recognition) initVoice();
   if (voiceActive.value) {
-    voiceActive.value = false
-    recognition.stop()
+    voiceActive.value = false;
+    recognition.stop();
   } else {
-    voiceActive.value = true
-    recognition.start()
+    voiceActive.value = true;
+    recognition.start();
   }
-}
+};
 
 // --- Hand Control ---
-const handActive = ref(false)
-const handStatus = ref('未开始')
-const handVideo = ref(null)
-let model = null
-let handInterval = null
+const handActive = ref(false);
+const handStatus = ref("未开始");
+const handVideo = ref(null);
+let model = null;
+let handInterval = null;
 
 const toggleHand = async () => {
   if (handActive.value) {
-    handActive.value = false
-    handTrack.stopVideo(handVideo.value)
-    clearInterval(handInterval)
-    handStatus.value = '已停止'
+    handActive.value = false;
+    handTrack.stopVideo(handVideo.value);
+    clearInterval(handInterval);
+    handStatus.value = "已停止";
   } else {
-    handActive.value = true
-    handStatus.value = '加载模型中...'
+    handActive.value = true;
+    handStatus.value = "加载模型中...";
     if (!model) {
-      model = await handTrack.load()
+      model = await handTrack.load();
     }
-    handStatus.value = '启动摄像头...'
-    handTrack.startVideo(handVideo.value).then(status => {
+    handStatus.value = "启动摄像头...";
+    handTrack.startVideo(handVideo.value).then((status) => {
       if (status) {
-        handStatus.value = '正在追踪'
+        handStatus.value = "正在追踪";
         handInterval = setInterval(async () => {
-          const predictions = await model.detect(handVideo.value)
+          const predictions = await model.detect(handVideo.value);
           if (predictions.length > 0) {
-            const hand = predictions[0]
-            if (hand.label === 'open') {
-              demoColor.value = '#ccffcc'
-              handStatus.value = '检测到：张开手'
-            } else if (hand.label === 'closed') {
-              demoColor.value = '#ffffcc'
-              handStatus.value = '检测到：握拳'
+            const hand = predictions[0];
+            if (hand.label === "open") {
+              demoColor.value = "#ccffcc";
+              handStatus.value = "检测到：张开手";
+            } else if (hand.label === "closed") {
+              demoColor.value = "#ffffcc";
+              handStatus.value = "检测到：握拳";
             }
           }
-        }, 500)
+        }, 500);
       } else {
-        handStatus.value = '无法启动摄像头'
-        handActive.value = false
+        handStatus.value = "无法启动摄像头";
+        handActive.value = false;
       }
-    })
+    });
   }
-}
+};
 
 // --- Eye Tracking Control ---
-const gazeActive = ref(false)
-const gazeX = ref(window.innerWidth / 2)
-const gazeY = ref(window.innerHeight / 2)
+const gazeActive = ref(false);
+const gazeX = ref(window.innerWidth / 2);
+const gazeY = ref(window.innerHeight / 2);
 
-const toggleGaze = () => {
+let webgazerApi = null;
+
+const getWebgazer = async () => {
+  if (webgazerApi) return webgazerApi;
+  const mod = await import("webgazer");
+  webgazerApi = mod.default ?? mod;
+  return webgazerApi;
+};
+
+const hideWebgazerUi = () => {
+  document
+    .getElementById("webgazerVideoContainer")
+    ?.setAttribute("style", "display: none !important");
+};
+
+const toggleGaze = async () => {
+  const webgazer = await getWebgazer();
   if (gazeActive.value) {
-    gazeActive.value = false
-    window.webgazer.pause()
-    // 隐藏 WebGazer 元素
-    document.getElementById('webgazerVideoContainer')?.setAttribute('style', 'display: none !important')
+    gazeActive.value = false;
+    webgazer.pause();
+    hideWebgazerUi();
   } else {
-    gazeActive.value = true
-    if (!window.webgazer.isReady) {
-      window.webgazer.setGazeListener((data, elapsedTime) => {
-        if (data == null) return
-        gazeX.value = data.x
-        gazeY.value = data.y
-      }).begin()
-      // 首次启动时默认显示视频以供校准，我们这里简单隐藏
+    gazeActive.value = true;
+    const isReady =
+      typeof webgazer.isReady === "function"
+        ? webgazer.isReady()
+        : Boolean(webgazer.isReady);
+    if (!isReady) {
+      webgazer
+        .setGazeListener((data) => {
+          if (data == null) return;
+          gazeX.value = data.x;
+          gazeY.value = data.y;
+        })
+        .begin();
       setTimeout(() => {
-        document.getElementById('webgazerVideoContainer')?.setAttribute('style', 'display: none !important')
-      }, 1000)
+        hideWebgazerUi();
+      }, 1000);
     } else {
-      window.webgazer.resume()
-      document.getElementById('webgazerVideoContainer')?.setAttribute('style', 'display: none !important')
+      webgazer.resume();
+      hideWebgazerUi();
     }
   }
-}
+};
 
 onMounted(() => {
-  initVoice()
-})
+  initVoice();
+});
 
 onUnmounted(() => {
-  if (recognition) recognition.stop()
-  if (handActive.value) handTrack.stopVideo(handVideo.value)
-  if (handInterval) clearInterval(handInterval)
-  if (window.webgazer) window.webgazer.end()
-})
+  if (recognition) recognition.stop();
+  if (handActive.value) handTrack.stopVideo(handVideo.value);
+  if (handInterval) clearInterval(handInterval);
+  if (webgazerApi) webgazerApi.end();
+});
 </script>
 
 <style scoped>
