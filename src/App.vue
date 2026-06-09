@@ -429,6 +429,10 @@ let gazeCalibrationTimer = null;
 let webgazerLoadPromise = null;
 
 const currentCalibrationPoint = ref(GAZE_CALIBRATION_POINTS[0]);
+const gazeSolutionPath = new URL(
+  `${import.meta.env.BASE_URL}mediapipe/face_mesh/`,
+  window.location.origin
+).toString();
 
 const loadWebgazerScript = () => {
   if (window.webgazer) {
@@ -493,6 +497,9 @@ const loadWebgazerScript = () => {
 const getWebgazer = async () => {
   if (webgazerApi) return webgazerApi;
   webgazerApi = await loadWebgazerScript();
+  if (webgazerApi?.params) {
+    webgazerApi.params.faceMeshSolutionPath = gazeSolutionPath;
+  }
   return webgazerApi;
 };
 
