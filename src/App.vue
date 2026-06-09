@@ -19,19 +19,12 @@
               <el-card shadow="hover" class="control-card">
                 <div class="control-card-top">
                   <h3 class="control-title">语音控制</h3>
-                  <span
-                    class="control-badge"
-                    :class="{ 'control-badge-active': voiceActive }"
-                  >
+                  <span class="control-badge" :class="{ 'control-badge-active': voiceActive }">
                     {{ voiceActive ? "运行中" : "待启动" }}
                   </span>
                 </div>
                 <p class="control-tech">Web Speech API</p>
-                <el-button
-                  class="control-action"
-                  :type="voiceActive ? 'danger' : 'primary'"
-                  @click="toggleVoice"
-                >
+                <el-button class="control-action" :type="voiceActive ? 'danger' : 'primary'" @click="toggleVoice">
                   {{ voiceActive ? "停止录音" : "开始录音" }}
                 </el-button>
                 <p class="control-desc">
@@ -47,31 +40,19 @@
               <el-card shadow="hover" class="control-card">
                 <div class="control-card-top">
                   <h3 class="control-title">手势控制</h3>
-                  <span
-                    class="control-badge"
-                    :class="{ 'control-badge-active': handActive }"
-                  >
+                  <span class="control-badge" :class="{ 'control-badge-active': handActive }">
                     {{ handActive ? "运行中" : "待启动" }}
                   </span>
                 </div>
                 <p class="control-tech">HandTrack.js</p>
-                <el-button
-                  class="control-action"
-                  :type="handActive ? 'danger' : 'primary'"
-                  @click="toggleHand"
-                >
+                <el-button class="control-action" :type="handActive ? 'danger' : 'primary'" @click="toggleHand">
                   {{ handActive ? "停止追踪" : "开始追踪" }}
                 </el-button>
                 <p class="control-desc">
                   检测到手部变绿，靠近镜头时切换为黄色高亮提示
                 </p>
                 <div class="status">检测状态：{{ handStatus }}</div>
-                <video
-                  ref="handVideo"
-                  muted
-                  playsinline
-                  style="display: none"
-                ></video>
+                <video ref="handVideo" muted playsinline style="display: none"></video>
               </el-card>
             </el-col>
 
@@ -79,19 +60,12 @@
               <el-card shadow="hover" class="control-card">
                 <div class="control-card-top">
                   <h3 class="control-title">眼动控制</h3>
-                  <span
-                    class="control-badge"
-                    :class="{ 'control-badge-active': gazeActive }"
-                  >
+                  <span class="control-badge" :class="{ 'control-badge-active': gazeActive }">
                     {{ gazeActive ? "运行中" : "待启动" }}
                   </span>
                 </div>
                 <p class="control-tech">WebGazer.js</p>
-                <el-button
-                  class="control-action"
-                  :type="gazeActive ? 'danger' : 'primary'"
-                  @click="toggleGaze"
-                >
+                <el-button class="control-action" :type="gazeActive ? 'danger' : 'primary'" @click="toggleGaze">
                   {{ gazeActive ? "停止眼动" : "开始眼动" }}
                 </el-button>
                 <p class="control-desc">
@@ -100,10 +74,10 @@
                 <div class="gaze-helper">
                   <span class="gaze-helper-text">
                     {{
-                      hasSeenGazeGuide
-                        ? "可随时重新查看权限与校准说明"
-                        : "首次使用建议先阅读权限与校准说明"
-                    }}
+            hasSeenGazeGuide
+              ? "可随时重新查看权限与校准说明"
+              : "首次使用建议先阅读权限与校准说明"
+          }}
                   </span>
                   <el-button link type="primary" @click="openGazeGuide">
                     {{ hasSeenGazeGuide ? "查看引导" : "首次引导" }}
@@ -118,13 +92,8 @@
                   {{ gazeCalibrationIndex + 1 }} /
                   {{ GAZE_CALIBRATION_POINTS.length }} 个点
                 </div>
-                <el-button
-                  v-if="gazeInitialized"
-                  class="gaze-recalibrate"
-                  text
-                  type="primary"
-                  @click="startCalibrationGuide"
-                >
+                <el-button v-if="gazeInitialized" class="gaze-recalibrate" text type="primary"
+                  @click="startCalibrationGuide">
                   重新校准
                 </el-button>
               </el-card>
@@ -143,10 +112,7 @@
                 语音会控制弹窗与背景色，手势会切换区域状态，眼动会驱动图标位置。
               </p>
             </div>
-            <div
-              class="gaze-target"
-              :style="{ left: gazeX + 'px', top: gazeY + 'px' }"
-            >
+            <div class="gaze-target" :style="{ left: gazeX + 'px', top: gazeY + 'px' }">
               👀
             </div>
             <div v-if="gazeCalibrating" class="gaze-calibration-panel">
@@ -160,24 +126,17 @@
                   秒，保持头部尽量稳定。
                 </p>
               </div>
-              <div
-                class="gaze-calibration-point"
-                :style="{
-                  left: currentCalibrationPoint.x,
-                  top: currentCalibrationPoint.y,
-                }"
-              ></div>
+              <div class="gaze-calibration-point" :style="{
+            left: currentCalibrationPoint.x,
+            top: currentCalibrationPoint.y,
+          }"></div>
             </div>
           </div>
         </section>
       </el-card>
     </section>
 
-    <el-dialog
-      v-model="dialogVisible"
-      title="语音控制弹窗"
-      width="min(92vw, 420px)"
-    >
+    <el-dialog v-model="dialogVisible" title="语音控制弹窗" width="min(92vw, 420px)">
       <span>你通过语音指令打开了这个弹窗！</span>
       <template #footer>
         <span class="dialog-footer">
@@ -186,11 +145,7 @@
       </template>
     </el-dialog>
 
-    <el-dialog
-      v-model="gazeGuideVisible"
-      title="眼动权限与校准提示"
-      width="min(92vw, 480px)"
-    >
+    <el-dialog v-model="gazeGuideVisible" title="眼动权限与校准提示" width="min(92vw, 480px)">
       <div class="gaze-guide-dialog">
         <p class="gaze-guide-intro">首次启动眼动控制前，请先确认以下事项：</p>
         <ul class="gaze-guide-list">
@@ -202,9 +157,7 @@
       </div>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="gazeGuideVisible = false"
-            >我知道了，稍后再试</el-button
-          >
+          <el-button @click="gazeGuideVisible = false">我知道了，稍后再试</el-button>
           <el-button type="primary" @click="confirmGazeGuide">
             继续启动眼动
           </el-button>
@@ -218,6 +171,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { ElMessage } from "element-plus";
 import * as handTrack from "handtrackjs";
+import webgazerScriptUrl from "webgazer/dist/webgazer.js?url";
 
 // --- State ---
 const demoColor = ref("#f0f2f5");
@@ -472,13 +426,73 @@ const GAZE_CALIBRATION_POINTS = [
 let webgazerApi = null;
 let gazeInitialized = false;
 let gazeCalibrationTimer = null;
+let webgazerLoadPromise = null;
 
 const currentCalibrationPoint = ref(GAZE_CALIBRATION_POINTS[0]);
 
+const loadWebgazerScript = () => {
+  if (window.webgazer) {
+    return Promise.resolve(window.webgazer);
+  }
+
+  if (webgazerLoadPromise) {
+    return webgazerLoadPromise;
+  }
+
+  webgazerLoadPromise = new Promise((resolve, reject) => {
+    const existingScript = document.querySelector(
+      'script[data-webgazer-script="true"]'
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener(
+        "load",
+        () => {
+          if (window.webgazer) {
+            resolve(window.webgazer);
+            return;
+          }
+          webgazerLoadPromise = null;
+          reject(new Error("WebGazer 脚本加载完成，但未找到可用实例"));
+        },
+        { once: true }
+      );
+      existingScript.addEventListener(
+        "error",
+        () => {
+          webgazerLoadPromise = null;
+          reject(new Error("WebGazer 脚本加载失败"));
+        },
+        { once: true }
+      );
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = webgazerScriptUrl;
+    script.async = true;
+    script.dataset.webgazerScript = "true";
+    script.onload = () => {
+      if (window.webgazer) {
+        resolve(window.webgazer);
+        return;
+      }
+      webgazerLoadPromise = null;
+      reject(new Error("WebGazer 脚本加载完成，但未找到可用实例"));
+    };
+    script.onerror = () => {
+      webgazerLoadPromise = null;
+      reject(new Error("WebGazer 脚本加载失败"));
+    };
+    document.head.appendChild(script);
+  });
+
+  return webgazerLoadPromise;
+};
+
 const getWebgazer = async () => {
   if (webgazerApi) return webgazerApi;
-  const mod = await import("webgazer");
-  webgazerApi = mod.default ?? mod;
+  webgazerApi = await loadWebgazerScript();
   return webgazerApi;
 };
 
@@ -687,11 +701,9 @@ onUnmounted(() => {
 .container {
   min-height: 100vh;
   padding: 24px 16px 40px;
-  background: radial-gradient(
-      circle at top,
+  background: radial-gradient(circle at top,
       rgba(64, 158, 255, 0.16),
-      transparent 28%
-    ),
+      transparent 28%),
     linear-gradient(180deg, #f7faff 0%, #eef3fb 100%);
   box-sizing: border-box;
 }
