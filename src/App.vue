@@ -97,7 +97,36 @@
                 <p class="control-desc">
                   注视屏幕不同区域，观察视线坐标与图标联动
                 </p>
-                <div class="status">坐标：{{ gazeX }}, {{ gazeY }}</div>
+                <div class="gaze-helper">
+                  <span class="gaze-helper-text">
+                    {{
+                      hasSeenGazeGuide
+                        ? "可随时重新查看权限与校准说明"
+                        : "首次使用建议先阅读权限与校准说明"
+                    }}
+                  </span>
+                  <el-button link type="primary" @click="openGazeGuide">
+                    {{ hasSeenGazeGuide ? "查看引导" : "首次引导" }}
+                  </el-button>
+                </div>
+                <div class="status">
+                  状态：{{ gazeStatus }}<br />
+                  坐标：{{ gazeX }}, {{ gazeY }}
+                </div>
+                <div v-if="gazeCalibrating" class="gaze-progress">
+                  校准中：请注视{{ currentCalibrationPoint.label }}， 第
+                  {{ gazeCalibrationIndex + 1 }} /
+                  {{ GAZE_CALIBRATION_POINTS.length }} 个点
+                </div>
+                <el-button
+                  v-if="gazeInitialized"
+                  class="gaze-recalibrate"
+                  text
+                  type="primary"
+                  @click="startCalibrationGuide"
+                >
+                  重新校准
+                </el-button>
               </el-card>
             </el-col>
           </el-row>
@@ -120,6 +149,25 @@
             >
               👀
             </div>
+            <div v-if="gazeCalibrating" class="gaze-calibration-panel">
+              <div class="gaze-calibration-copy">
+                <span class="gaze-calibration-label">
+                  校准步骤 {{ gazeCalibrationIndex + 1 }} /
+                  {{ GAZE_CALIBRATION_POINTS.length }}
+                </span>
+                <p class="gaze-calibration-text">
+                  请注视{{ currentCalibrationPoint.label }}约 1
+                  秒，保持头部尽量稳定。
+                </p>
+              </div>
+              <div
+                class="gaze-calibration-point"
+                :style="{
+                  left: currentCalibrationPoint.x,
+                  top: currentCalibrationPoint.y,
+                }"
+              ></div>
+            </div>
           </div>
         </section>
       </el-card>
@@ -134,6 +182,32 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="gazeGuideVisible"
+      title="眼动权限与校准提示"
+      width="min(92vw, 480px)"
+    >
+      <div class="gaze-guide-dialog">
+        <p class="gaze-guide-intro">首次启动眼动控制前，请先确认以下事项：</p>
+        <ul class="gaze-guide-list">
+          <li>点击“允许”授予浏览器摄像头权限。</li>
+          <li>保持面部在画面中，环境光线尽量均匀。</li>
+          <li>启动后请依次注视屏幕上的五个校准点。</li>
+          <li>建议优先使用 `localhost` 或 HTTPS 地址访问页面。</li>
+        </ul>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="gazeGuideVisible = false"
+            >我知道了，稍后再试</el-button
+          >
+          <el-button type="primary" @click="confirmGazeGuide">
+            继续启动眼动
+          </el-button>
         </span>
       </template>
     </el-dialog>
@@ -380,8 +454,26 @@ const toggleHand = async () => {
 const gazeActive = ref(false);
 const gazeX = ref(window.innerWidth / 2);
 const gazeY = ref(window.innerHeight / 2);
+const gazeStatus = ref("未开始");
+const gazeGuideVisible = ref(false);
+const hasSeenGazeGuide = ref(false);
+const gazeCalibrating = ref(false);
+const gazeCalibrationIndex = ref(0);
+
+const GAZE_GUIDE_STORAGE_KEY = "zero-threshold-gaze-guide-seen";
+const GAZE_CALIBRATION_POINTS = [
+  { label: "左上角", x: "12%", y: "14%" },
+  { label: "右上角", x: "88%", y: "14%" },
+  { label: "屏幕中央", x: "50%", y: "50%" },
+  { label: "左下角", x: "12%", y: "84%" },
+  { label: "右下角", x: "88%", y: "84%" },
+];
 
 let webgazerApi = null;
+let gazeInitialized = false;
+let gazeCalibrationTimer = null;
+
+const currentCalibrationPoint = ref(GAZE_CALIBRATION_POINTS[0]);
 
 const getWebgazer = async () => {
   if (webgazerApi) return webgazerApi;
@@ -390,50 +482,204 @@ const getWebgazer = async () => {
   return webgazerApi;
 };
 
-const hideWebgazerUi = () => {
-  document
-    .getElementById("webgazerVideoContainer")
-    ?.setAttribute("style", "display: none !important");
+const loadGazeGuideState = () => {
+  hasSeenGazeGuide.value =
+    window.localStorage.getItem(GAZE_GUIDE_STORAGE_KEY) === "true";
+
+  if (!hasSeenGazeGuide.value) {
+    gazeStatus.value = "首次使用请先阅读权限与校准提示";
+  }
+};
+
+const markGazeGuideSeen = () => {
+  hasSeenGazeGuide.value = true;
+  window.localStorage.setItem(GAZE_GUIDE_STORAGE_KEY, "true");
+};
+
+const getGazeErrorMessage = (error) => {
+  const errorName = error?.name || "";
+
+  if (
+    errorName === "NotAllowedError" ||
+    errorName === "PermissionDeniedError"
+  ) {
+    return "摄像头权限被拒绝，请允许眼动模块访问摄像头";
+  }
+
+  if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
+    return "未检测到可用于眼动追踪的摄像头";
+  }
+
+  if (errorName === "NotReadableError" || errorName === "TrackStartError") {
+    return "摄像头正在被其他应用占用，暂时无法启动眼动追踪";
+  }
+
+  return error?.message || "眼动模块启动失败";
+};
+
+const updateGazePoint = (data) => {
+  if (!data) {
+    return;
+  }
+
+  gazeX.value = Math.round(data.x);
+  gazeY.value = Math.round(data.y);
+};
+
+const applyWebgazerDisplay = (webgazer, visible) => {
+  webgazer.showVideoPreview(visible);
+  webgazer.showPredictionPoints(false);
+};
+
+const clearGazeCalibrationTimer = () => {
+  if (gazeCalibrationTimer) {
+    clearTimeout(gazeCalibrationTimer);
+    gazeCalibrationTimer = null;
+  }
+};
+
+const finishCalibrationGuide = () => {
+  clearGazeCalibrationTimer();
+  gazeCalibrating.value = false;
+
+  if (gazeActive.value) {
+    gazeStatus.value = "校准完成，请缓慢移动视线观察跟踪效果";
+  }
+};
+
+const runCalibrationGuide = () => {
+  currentCalibrationPoint.value =
+    GAZE_CALIBRATION_POINTS[gazeCalibrationIndex.value];
+  gazeStatus.value = `校准中：请注视${currentCalibrationPoint.value.label}`;
+
+  gazeCalibrationTimer = setTimeout(() => {
+    if (gazeCalibrationIndex.value >= GAZE_CALIBRATION_POINTS.length - 1) {
+      finishCalibrationGuide();
+      return;
+    }
+
+    gazeCalibrationIndex.value += 1;
+    runCalibrationGuide();
+  }, 1200);
+};
+
+const startCalibrationGuide = () => {
+  if (!gazeInitialized) {
+    gazeStatus.value = "请先启动眼动控制，再进行校准";
+    return;
+  }
+
+  clearGazeCalibrationTimer();
+  gazeCalibrating.value = true;
+  gazeCalibrationIndex.value = 0;
+  runCalibrationGuide();
+};
+
+const openGazeGuide = () => {
+  gazeGuideVisible.value = true;
+};
+
+const startGazeTracking = async () => {
+  if (!window.isSecureContext) {
+    throw new Error("眼动控制需要在 HTTPS 或 localhost 环境下运行");
+  }
+
+  const webgazer = await getWebgazer();
+
+  if (!webgazer.detectCompatibility()) {
+    throw new Error("当前浏览器不支持 WebGazer 眼动追踪");
+  }
+
+  webgazer
+    .setGazeListener((data) => {
+      updateGazePoint(data);
+    })
+    .saveDataAcrossSessions(false);
+
+  if (!gazeInitialized) {
+    gazeStatus.value = "请求摄像头权限中...";
+    await webgazer.begin();
+    gazeInitialized = true;
+  } else {
+    gazeStatus.value = "恢复眼动追踪中...";
+    await webgazer.resume();
+  }
+
+  applyWebgazerDisplay(webgazer, false);
+  gazeStatus.value = "正在追踪视线";
+};
+
+const stopGazeTracking = async () => {
+  clearGazeCalibrationTimer();
+  gazeCalibrating.value = false;
+
+  if (!webgazerApi || !gazeInitialized) {
+    gazeActive.value = false;
+    gazeStatus.value = "已停止";
+    return;
+  }
+
+  webgazerApi.pause();
+  applyWebgazerDisplay(webgazerApi, false);
+  webgazerApi.clearGazeListener();
+  gazeActive.value = false;
+  gazeStatus.value = "已停止";
+};
+
+const activateGazeTracking = async () => {
+  gazeActive.value = true;
+  await startGazeTracking();
+  startCalibrationGuide();
+};
+
+const confirmGazeGuide = async () => {
+  gazeGuideVisible.value = false;
+  markGazeGuideSeen();
+
+  try {
+    await activateGazeTracking();
+  } catch (error) {
+    gazeActive.value = false;
+    gazeStatus.value = getGazeErrorMessage(error);
+    ElMessage.error(gazeStatus.value);
+    console.error(error);
+  }
 };
 
 const toggleGaze = async () => {
-  const webgazer = await getWebgazer();
   if (gazeActive.value) {
+    await stopGazeTracking();
+    return;
+  }
+
+  if (!hasSeenGazeGuide.value) {
+    openGazeGuide();
+    return;
+  }
+
+  try {
+    await activateGazeTracking();
+  } catch (error) {
     gazeActive.value = false;
-    webgazer.pause();
-    hideWebgazerUi();
-  } else {
-    gazeActive.value = true;
-    const isReady =
-      typeof webgazer.isReady === "function"
-        ? webgazer.isReady()
-        : Boolean(webgazer.isReady);
-    if (!isReady) {
-      webgazer
-        .setGazeListener((data) => {
-          if (data == null) return;
-          gazeX.value = data.x;
-          gazeY.value = data.y;
-        })
-        .begin();
-      setTimeout(() => {
-        hideWebgazerUi();
-      }, 1000);
-    } else {
-      webgazer.resume();
-      hideWebgazerUi();
-    }
+    gazeStatus.value = getGazeErrorMessage(error);
+    ElMessage.error(gazeStatus.value);
+    console.error(error);
   }
 };
 
 onMounted(() => {
   initVoice();
+  loadGazeGuideState();
 });
 
 onUnmounted(() => {
   if (recognition) recognition.stop();
   stopHandCamera();
-  if (webgazerApi) webgazerApi.end();
+  clearGazeCalibrationTimer();
+  if (webgazerApi && gazeInitialized) {
+    webgazerApi.clearGazeListener();
+    webgazerApi.end();
+  }
 });
 </script>
 
@@ -567,6 +813,32 @@ onUnmounted(() => {
   word-break: break-word;
 }
 
+.gaze-helper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.gaze-helper-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #667085;
+}
+
+.gaze-progress {
+  margin-top: 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #409eff;
+}
+
+.gaze-recalibrate {
+  margin-top: 4px;
+  padding-left: 0;
+}
+
 .demo-section {
   margin-top: 8px;
 }
@@ -630,6 +902,87 @@ onUnmounted(() => {
   transition: all 0.1s ease;
 }
 
+.gaze-calibration-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: rgba(15, 23, 42, 0.12);
+}
+
+.gaze-calibration-copy {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  max-width: 320px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+.gaze-calibration-label {
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #409eff;
+}
+
+.gaze-calibration-text {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #344054;
+}
+
+.gaze-calibration-point {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 4px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: #409eff;
+  box-shadow: 0 0 0 10px rgba(64, 158, 255, 0.2);
+  transform: translate(-50%, -50%);
+  animation: calibration-pulse 1.2s infinite;
+}
+
+.gaze-guide-dialog {
+  padding-top: 4px;
+}
+
+.gaze-guide-intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: #344054;
+}
+
+.gaze-guide-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #4b5563;
+}
+
+.gaze-guide-list li {
+  margin-bottom: 8px;
+  line-height: 1.7;
+}
+
+@keyframes calibration-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+}
+
 @media (max-width: 1024px) {
   .page-title {
     font-size: 26px;
@@ -670,6 +1023,12 @@ onUnmounted(() => {
     padding: 20px;
   }
 
+  .gaze-calibration-copy {
+    right: 20px;
+    bottom: 20px;
+    max-width: 280px;
+  }
+
   .demo-copy {
     max-width: 100%;
     padding: 16px;
@@ -698,9 +1057,21 @@ onUnmounted(() => {
     margin-top: 2px;
   }
 
+  .gaze-helper {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .demo-area {
     min-height: 260px;
     padding: 16px;
+  }
+
+  .gaze-calibration-copy {
+    right: 16px;
+    bottom: 16px;
+    left: 16px;
+    max-width: none;
   }
 
   .demo-title {
